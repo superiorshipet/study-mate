@@ -138,20 +138,6 @@ app.UseSwaggerUI();
 Console.WriteLine("CORS policy enabled");
 app.UseCors("AllowReactApp");
 
-// Handle CORS preflight requests
-app.Use(async (context, next) =>
-{
-    if (context.Request.Method == "OPTIONS")
-    {
-        context.Response.Headers.Add("Access-Control-Allow-Origin", context.Request.Headers["Origin"].ToString() ?? "*");
-        context.Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        context.Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
-        context.Response.StatusCode = 200;
-        return;
-    }
-    await next(context);
-});
-
 Console.WriteLine("Authentication and Authorization configured");
 app.UseAuthentication();
 app.UseAuthorization();
