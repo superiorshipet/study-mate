@@ -139,3 +139,5 @@ C:\Users\DELL\study-mate\backend\StudyMate\obj\Release\net8.0\refint\StudyMate.d
 C:\Users\DELL\study-mate\backend\StudyMate\obj\Release\net8.0\StudyMate.pdb
 C:\Users\DELL\study-mate\backend\StudyMate\obj\Release\net8.0\StudyMate.genruntimeconfig.cache
 C:\Users\DELL\study-mate\backend\StudyMate\obj\Release\net8.0\ref\StudyMate.dll
+C:\Users\DELL\study-mate\backend\StudyMate\bin\Release\net8.0\Newtonsoft.Json.dll
+C:\Users\DELL\study-mate\backend\StudyMate\bin\Release\net8.0\Stripe.net.dll

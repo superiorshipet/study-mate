@@ -38,7 +38,8 @@ public class StudyMateDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.HasOne(e => e.User)
                 .WithOne(u => u.TeacherProfile)
-                .HasForeignKey<TeacherProfile>(e => e.UserId);
+                .HasForeignKey<TeacherProfile>(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // StudentProfile configuration
@@ -47,7 +48,8 @@ public class StudyMateDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.HasOne(e => e.User)
                 .WithOne(u => u.StudentProfile)
-                .HasForeignKey<StudentProfile>(e => e.UserId);
+                .HasForeignKey<StudentProfile>(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Course configuration
@@ -78,10 +80,12 @@ public class StudyMateDbContext : DbContext
             entity.Property(e => e.Amount).HasPrecision(18, 2);
             entity.HasOne(e => e.Student)
                 .WithMany(s => s.Payments)
-                .HasForeignKey(e => e.StudentId);
+                .HasForeignKey(e => e.StudentId)
+                .OnDelete(DeleteBehavior.NoAction);
             entity.HasOne(e => e.Course)
                 .WithMany()
-                .HasForeignKey(e => e.CourseId);
+                .HasForeignKey(e => e.CourseId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         // Enrollment configuration
@@ -90,10 +94,12 @@ public class StudyMateDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.HasOne(e => e.Student)
                 .WithMany(s => s.Enrollments)
-                .HasForeignKey(e => e.StudentId);
+                .HasForeignKey(e => e.StudentId)
+                .OnDelete(DeleteBehavior.NoAction);
             entity.HasOne(e => e.Course)
                 .WithMany(c => c.Enrollments)
-                .HasForeignKey(e => e.CourseId);
+                .HasForeignKey(e => e.CourseId)
+                .OnDelete(DeleteBehavior.NoAction);
             entity.HasIndex(e => new { e.StudentId, e.CourseId }).IsUnique();
         });
     }

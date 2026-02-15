@@ -3,19 +3,21 @@ using Microsoft.AspNetCore.Mvc;
 using StudyMate.DTOs;
 using StudyMate.Models;
 using StudyMate.Interfaces;
+using System.Security.Claims;
 
 namespace StudyMate.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class CoursesController : ControllerBase
 {
     private readonly ICourseRepository _courseRepository;
+    private readonly IUserRepository _userRepository;
 
-    public CoursesController(ICourseRepository courseRepository)
+    public CoursesController(ICourseRepository courseRepository, IUserRepository userRepository)
     {
         _courseRepository = courseRepository;
+        _userRepository = userRepository;
     }
 
     [HttpGet]
@@ -23,6 +25,21 @@ public class CoursesController : ControllerBase
     public async Task<IActionResult> GetAll()
     {
         var courses = await _courseRepository.GetPublishedCoursesAsync();
+        var courseDtos = courses.Select(MapToCourseDto).ToList();
+        return Ok(courseDtos);
+    }
+
+    [HttpGet("my-courses")]
+    [Authorize(Roles = "Teacher")]
+    public async Task<IActionResult> GetMyCourses()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var teacherId))
+        {
+            return Unauthorized();
+        }
+
+        var courses = await _courseRepository.GetByTeacherIdAsync(teacherId);
         var courseDtos = courses.Select(MapToCourseDto).ToList();
         return Ok(courseDtos);
     }
@@ -40,8 +57,49 @@ public class CoursesController : ControllerBase
         return Ok(courseDto);
     }
 
+    [HttpGet("by-code/{code}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetByAccessCode(string code)
+    {
+        var courses = await _courseRepository.GetPublishedCoursesAsync();
+        var course = courses.FirstOrDefault(c => c.AccessCode == code);
+        
+        if (course == null)
+        {
+            return NotFound(new { message = "Course not found" });
+        }
+
+        var courseDto = MapToCourseDto(course);
+        return Ok(courseDto);
+    }
+
+    [HttpPost("validate-code")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ValidateAccessCode([FromBody] ValidateAccessCodeDto validateDto)
+    {
+        var courses = await _courseRepository.GetPublishedCoursesAsync();
+        var course = courses.FirstOrDefault(c => c.AccessCode == validateDto.AccessCode);
+        
+        if (course == null)
+        {
+            return Ok(new AccessCodeResponseDto
+            {
+                IsValid = false,
+                Message = "Invalid access code"
+            });
+        }
+
+        return Ok(new AccessCodeResponseDto
+        {
+            IsValid = true,
+            CourseId = course.Id,
+            CourseTitle = course.Title,
+            Message = "Valid access code"
+        });
+    }
+
     [HttpGet("teacher/{teacherId}")]
-    [Authorize(Roles = "Teacher")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetByTeacherId(Guid teacherId)
     {
         var courses = await _courseRepository.GetByTeacherIdAsync(teacherId);

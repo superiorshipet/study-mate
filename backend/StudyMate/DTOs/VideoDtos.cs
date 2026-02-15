@@ -36,3 +36,32 @@ public class UpdateVideoDto
     public int Order { get; set; }
     public bool IsPublished { get; set; }
 }
+public class VideoWatchDto
+{
+    public Guid StudentId { get; set; }
+    public Guid VideoId { get; set; }
+    public int WatchedDuration { get; set; }
+}
+
+public class VideoProgressDto
+{
+    public Guid VideoId { get; set; }
+    public int WatchedDuration { get; set; }
+    public int TotalDuration { get; set; }
+    public double ProgressPercentage { get; set; }
+    public DateTime? LastWatchedAt { get; set; }
+}
+
+public class VideoAnalyticsDto
+{
+    public Guid VideoId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public int ViewCount { get; set; }
+    public int StudentCount { get; set; }
+    public double AverageCompletionPercentage { get; set; }
+}
+
+public class UpdateVideoDurationDto
+{
+    public int Duration { get; set; }
+}

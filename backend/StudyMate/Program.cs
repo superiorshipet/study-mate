@@ -6,6 +6,7 @@ using Microsoft.OpenApi.Models;
 using StudyMate.Interfaces;
 using StudyMate.Data;
 using StudyMate.Repositories;
+using StudyMate.Services;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,7 +21,9 @@ builder.Services.AddControllers();
 try
 {
     builder.Services.AddDbContext<StudyMateDbContext>(options =>
-        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+        options.UseSqlServer(
+            builder.Configuration.GetConnectionString("DefaultConnection"),
+            sqlOptions => sqlOptions.EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null)));
 }
 catch (Exception ex)
 {
@@ -52,9 +55,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
+        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "https://localhost:3000", "https://localhost:5173")
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -64,6 +68,9 @@ builder.Services.AddScoped<ICourseRepository, CourseRepository>();
 builder.Services.AddScoped<IVideoRepository, VideoRepository>();
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
+
+// Register Payment Service
+builder.Services.AddScoped<IPaymentService, StripePaymentService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -99,6 +106,30 @@ var app = builder.Build();
 Console.WriteLine("StudyMate API starting...");
 Console.WriteLine($"Environment: {app.Environment.EnvironmentName}");
 
+// Initialize database
+try
+{
+    Console.WriteLine("Initializing database...");
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<StudyMateDbContext>();
+        try
+        {
+            // Ensure the database exists
+            db.Database.EnsureCreated();
+            Console.WriteLine("Database is ready");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Database initialization warning: {ex.Message}");
+        }
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Database initialization error: {ex.Message}");
+}
+
 // Configure the HTTP request pipeline.
 Console.WriteLine("Configuring Swagger...");
 app.UseSwagger();
@@ -106,6 +137,20 @@ app.UseSwaggerUI();
 
 Console.WriteLine("CORS policy enabled");
 app.UseCors("AllowReactApp");
+
+// Handle CORS preflight requests
+app.Use(async (context, next) =>
+{
+    if (context.Request.Method == "OPTIONS")
+    {
+        context.Response.Headers.Add("Access-Control-Allow-Origin", context.Request.Headers["Origin"].ToString() ?? "*");
+        context.Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        context.Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        context.Response.StatusCode = 200;
+        return;
+    }
+    await next(context);
+});
 
 Console.WriteLine("Authentication and Authorization configured");
 app.UseAuthentication();

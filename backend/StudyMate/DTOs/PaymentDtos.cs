@@ -30,3 +30,19 @@ public class UpdatePaymentDto
     public string Status { get; set; } = string.Empty;
     public string? FailureReason { get; set; }
 }
+public class TeacherEarningsDto
+{
+    public decimal TotalEarnings { get; set; }
+    public decimal ThisMonthEarnings { get; set; }
+    public int TotalTransactions { get; set; }
+}
+
+public class PaymentHistoryDto
+{
+    public Guid Id { get; set; }
+    public string CourseTitle { get; set; } = string.Empty;
+    public string StudentName { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+}

@@ -12,10 +12,17 @@ namespace StudyMate.Controllers;
 public class VideosController : ControllerBase
 {
     private readonly IVideoRepository _videoRepository;
+    private readonly IWebHostEnvironment _environment;
+    private readonly ILogger<VideosController> _logger;
 
-    public VideosController(IVideoRepository videoRepository)
+    public VideosController(
+        IVideoRepository videoRepository,
+        IWebHostEnvironment environment,
+        ILogger<VideosController> logger)
     {
         _videoRepository = videoRepository;
+        _environment = environment;
+        _logger = logger;
     }
 
     [HttpGet("course/{courseId}")]
@@ -63,6 +70,81 @@ public class VideosController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = createdVideo.Id }, videoDto);
     }
 
+    [HttpPost("upload")]
+    [Authorize(Roles = "Teacher")]
+    public async Task<IActionResult> UploadVideo(
+        [FromForm] string title,
+        [FromForm] string description,
+        [FromForm] string category,
+        [FromForm] string price,
+        [FromForm] IFormFile? file)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { message = "اختر ملف فيديو رجاء" });
+            }
+
+            // Validate file size (2GB max)
+            const long maxFileSize = 2L * 1024L * 1024L * 1024L; // 2GB
+            if (file.Length > maxFileSize)
+            {
+                return BadRequest(new { message = "حجم الملف أكبر من 2 جيجا" });
+            }
+
+            // Validate file type
+            var allowedExtensions = new[] { ".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv" };
+            var fileExtension = Path.GetExtension(file.FileName).ToLower();
+            if (!allowedExtensions.Contains(fileExtension))
+            {
+                return BadRequest(new { message = "صيغة الملف غير مدعومة" });
+            }
+
+            // Create uploads directory if it doesn't exist
+            var uploadsDir = Path.Combine(_environment.WebRootPath ?? "wwwroot", "uploads", "videos");
+            Directory.CreateDirectory(uploadsDir);
+
+            // Generate unique filename
+            var fileName = $"{Guid.NewGuid()}{fileExtension}";
+            var filePath = Path.Combine(uploadsDir, fileName);
+
+            // Save file
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            // For now, create a mock Guid courseId - in production, user would select course
+            var courseId = Guid.NewGuid();
+
+            // Create video record in database
+            var video = new Video
+            {
+                Id = Guid.NewGuid(),
+                CourseId = courseId,
+                Title = title,
+                Description = description,
+                VideoUrl = $"/uploads/videos/{fileName}",
+                ThumbnailUrl = $"/uploads/videos/thumbnails/{fileName}.jpg", // Would need thumbnail generation
+                Duration = 0, // Would need video analysis to get actual duration
+                Order = 1,
+                IsPublished = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var createdVideo = await _videoRepository.AddAsync(video);
+            var videoDto = MapToVideoDto(createdVideo);
+
+            return CreatedAtAction(nameof(GetById), new { id = createdVideo.Id }, videoDto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading video");
+            return StatusCode(500, new { message = "حدث خطأ في رفع الفيديو", details = ex.Message });
+        }
+    }
+
     [HttpPut("{id}")]
     [Authorize(Roles = "Teacher")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateVideoDto updateDto)
@@ -93,6 +175,91 @@ public class VideosController : ControllerBase
     {
         await _videoRepository.DeleteAsync(id);
         return NoContent();
+    }
+
+    [HttpPost("{id}/watch")]
+    [Authorize]
+    public async Task<IActionResult> MarkVideoAsWatched(Guid id, [FromBody] VideoWatchDto watchDto)
+    {
+        var video = await _videoRepository.GetByIdAsync(id);
+        if (video == null)
+        {
+            return NotFound(new { message = "Video not found" });
+        }
+
+        // In a real app, you would store this in a database table for tracking
+        // For now, just return success
+        return Ok(new { message = "Video watch recorded", videoId = id });
+    }
+
+    [HttpGet("{id}/progress")]
+    [Authorize]
+    public async Task<IActionResult> GetVideoProgress(Guid id)
+    {
+        var video = await _videoRepository.GetByIdAsync(id);
+        if (video == null)
+        {
+            return NotFound(new { message = "Video not found" });
+        }
+
+        var progressDto = new VideoProgressDto
+        {
+            VideoId = id,
+            WatchedDuration = 0, // Would fetch from database
+            TotalDuration = video.Duration,
+            ProgressPercentage = 0,
+            LastWatchedAt = null
+        };
+
+        return Ok(progressDto);
+    }
+
+    [HttpPost("{id}/duration")]
+    [Authorize(Roles = "Teacher")]
+    public async Task<IActionResult> UpdateVideoDuration(Guid id, [FromBody] UpdateVideoDurationDto updateDto)
+    {
+        var video = await _videoRepository.GetByIdAsync(id);
+        if (video == null)
+        {
+            return NotFound(new { message = "Video not found" });
+        }
+
+        video.Duration = updateDto.Duration;
+        video.UpdatedAt = DateTime.UtcNow;
+        
+        await _videoRepository.UpdateAsync(video);
+        return Ok(new { message = "Duration updated", duration = video.Duration });
+    }
+
+    [HttpGet("{id}/analytics")]
+    [Authorize(Roles = "Teacher")]
+    public async Task<IActionResult> GetVideoAnalytics(Guid id)
+    {
+        var video = await _videoRepository.GetByIdAsync(id);
+        if (video == null)
+        {
+            return NotFound(new { message = "Video not found" });
+        }
+
+        var analyticsDto = new VideoAnalyticsDto
+        {
+            VideoId = id,
+            Title = video.Title,
+            ViewCount = 0, // Would fetch from database
+            StudentCount = 0, // Would fetch from enrollments
+            AverageCompletionPercentage = 0
+        };
+
+        return Ok(analyticsDto);
+    }
+
+    [HttpGet("my-videos")]
+    [Authorize(Roles = "Teacher")]
+    public async Task<IActionResult> GetMyVideos()
+    {
+        // This endpoint would require joining with courses and getting teacher's courses
+        // For now, return empty list - implementation depends on repository design
+        return Ok(new List<VideoDto>());
     }
 
     private static VideoDto MapToVideoDto(Video video)

@@ -44,3 +44,15 @@ public class UpdateCourseDto
     public bool IsPaid { get; set; }
     public string? AccessCode { get; set; }
 }
+public class ValidateAccessCodeDto
+{
+    public string AccessCode { get; set; } = string.Empty;
+}
+
+public class AccessCodeResponseDto
+{
+    public bool IsValid { get; set; }
+    public Guid CourseId { get; set; }
+    public string CourseTitle { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+}
